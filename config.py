@@ -17,7 +17,7 @@ block_list = ['https://www.bing.com/new/termsofuse','https://privacy.microsoft.c
               'http://maps.google.com/maps','https://login.yahoo.com?.src=search','https://images.search.yahoo.com/search',
               'https://video.search.yahoo.com/search','https://search.yahoo.com/search?ei=UTF-8&','https://yahoo.uservoice.com/forums',
               'https://legal.yahoo.com/','https://guce.yahoo.com/privacy-dashboard','https://help.yahoo.com',
-              'https://www.yahoo.com','https://www.google.com/imgres'
+              'https://www.yahoo.com','https://www.google.com/imgres','https://www.google.com/maps'
              ]
 
 #list of urls pertaining to ads to exclude from search engine results

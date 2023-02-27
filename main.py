@@ -79,6 +79,9 @@ async def get_html(session, url):
     #if timeout, return "TimeoutError" and url as tuple 
     except asyncio.exceptions.TimeoutError:
         return "TimeoutError", url
+    #if invalid url, return "InvalidURL" and url as tuple 
+    except aiohttp.client_exceptions.InvalidURL:
+        return "InvaidURL", url 
     
 #define tasks for the urls 
 async def get_all(session, urls):
