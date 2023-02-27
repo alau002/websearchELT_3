@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import mysql.connector
 import aiohttp
 import asyncio
+import async_timeout
+import urllib.parse
 import config
 
 #function for prompting user to define search engine and query
@@ -47,18 +49,36 @@ def urls(soup,engine):
     #return cleaned up list of urls 
     return list(map(str,map(lambda x: x.strip('/url?q='),url)))
 
-#get raw text from urls resulting from engine scrape
-def get_raw_text(url):
-    soup = BeautifulSoup(requests.get(url).text,'html.parser')
+#remove duplicate domains from scraped urls
+def remove_dup(urls):
+    #dictionary to hold domain key and url value 
+    new_urls={}
+    #for each url, check if domain is in dictionary 
+    for url in urls:
+        parts = urllib.parse.urlparse(url)
+        if parts.netloc not in new_urls:
+            #add domain and url into dictionary 
+            new_urls[parts.netloc] = url
+    #return filtered urls as a list 
+    return list(new_urls.values())
+
+#get raw text from html resulting from engine scrape
+def get_raw_text(text):
+    soup = BeautifulSoup(text,'html.parser')
     for script in soup(['script','style','template','TemplateString','ProcessingInstruction','Declaration','Doctype']):
         script.extract()
-    return (url,soup.get_text(strip=True).replace(u'\xa0', u' ').encode('ascii','ignore')[0:1000])
+    return (soup.get_text(strip=True).replace(u'\xa0', u' ').encode('ascii','ignore')[0:1000])
 
 #async get html from url 
 async def get_html(session, url):
     #get html text from session object 
-    async with session.get(url) as response:
-        return await response.text()
+    try:
+        async with async_timeout.timeout(10):
+            async with session.get(url) as response:
+                return await response.text(), url
+    #if timeout, return "TimeoutError" and url as tuple 
+    except asyncio.exceptions.TimeoutError:
+        return "TimeoutError", url
     
 #define tasks for the urls 
 async def get_all(session, urls):
@@ -77,8 +97,8 @@ async def async_main(urls):
     async with aiohttp.ClientSession() as session:
         #get data obtained from get_all with defined session object and urls 
         data = await get_all(session, urls)
-        #return list of data 
-        return data 
+        #return list of data, where each element is a tuple containing html, url 
+        return data
 
 
 def main():
@@ -91,8 +111,14 @@ def main():
     #create beautifulsoup object 
     soup = BeautifulSoup(r.text, 'html.parser')
 
-    #get url and raw text from scraped urls
-    url_text = map(lambda x: get_raw_text(x), urls(soup,engine))
+    #get scraped urls, while removing duplicate domains 
+    url_list = remove_dup(urls(soup,engine))
+
+    #asynchronously get html text from urls obtained via search engine scrape
+    text_url = asyncio.run(async_main(url_list))
+
+    #return cleaned up text as a tuple with the url
+    cleaned_text_url = map(lambda x: (get_raw_text(x[0]),x[1]), text_url)
 
     #get config MySQL parameters
     mySQLparams = config.mySQLparams
@@ -110,7 +136,7 @@ def main():
     last_search_id = cursor.lastrowid
 
     #inserting url info
-    for url,text in url_text:
+    for text,url in cleaned_text_url:
         tables = config.tables
         query = 'INSERT INTO ' +tables[engine]+'(url,search_id,raw_text) values(%s,%s,%s)'
         cursor.execute(query, (url,last_search_id,text))
