@@ -7,6 +7,7 @@ import asyncio
 import async_timeout
 import urllib.parse
 import config
+import sys
 
 #function for prompting user to define search engine and query
 def get_inputs():
@@ -20,6 +21,25 @@ def get_inputs():
     input_query = input('Enter search query: ')
     
     return engine, input_query 
+
+#special logic for javascript handling in DuckDuckGo
+def get_js_soup(url):
+    #import selenium only for search engines that load urls via javascript
+    import selenium
+    from selenium import webdriver
+    try: 
+        #define browser using safari driver 
+        browser = webdriver.Safari()
+        #request url
+        browser.get(url)
+        #get html from webpage
+        soup = BeautifulSoup(browser.page_source, 'html.parser')
+        #quit browser 
+        browser.quit()
+        return soup
+    except selenium.common.exceptions.WebDriverException:
+        print('\nWebdriver Exception. Search engine option capatible with Safari only.\n')
+        sys.exit(1) 
 
 #filter function to clean up url scrape results 
 def filter_function(url,block_list,ad_block_list):
@@ -82,6 +102,8 @@ async def get_html(session, url):
     #if invalid url, return "InvalidURL" and url as tuple 
     except aiohttp.client_exceptions.InvalidURL:
         return "InvaidURL", url 
+    except aiohttp.client_exceptions.ServerDisconnectedError:
+        return 'ServerDisconnected', url 
     
 #define tasks for the urls 
 async def get_all(session, urls):
@@ -108,11 +130,14 @@ def main():
     #get engine and query from user 
     engine, input_query = get_inputs()
 
-    #request html from web search
-    r = requests.get(config.engines[engine]+input_query, headers={'user-agent': 'my-app/0.0.1'})
-
-    #create beautifulsoup object 
-    soup = BeautifulSoup(r.text, 'html.parser')
+    if engine not in config.js_engines:
+        #request html from web search
+        r = requests.get(config.engines[engine]+input_query, headers={'user-agent': 'my-app/0.0.1'})
+        #create beautifulsoup object 
+        soup = BeautifulSoup(r.text, 'html.parser')
+    else:
+        #use special handling for javascript 
+        soup = get_js_soup(config.engines[engine]+input_query)
 
     #get scraped urls, while removing duplicate domains 
     url_list = remove_dup(urls(soup,engine))
