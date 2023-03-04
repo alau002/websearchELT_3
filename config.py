@@ -33,3 +33,10 @@ mySQLparams = {'user':'root','database':'MY_CUSTOM_BOT','password':''}
 
 #tables in MySQL database to insert data into
 tables = {'Bing':'bing_results', 'Google':'google_results', 'Yahoo':'yahoo_results','DuckDuckGo':'duckduckgo_results'}
+
+#sql query for inserting data into searches table 
+add_search = ('INSERT INTO searches(query,engine) values(%s, %s)')
+
+#return sql query for defined engine table 
+def get_add_engineinfo(engine):
+    return 'INSERT INTO '+engine+'(url,search_id,raw_text) values(%s,%s,%s)'
