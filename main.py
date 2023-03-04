@@ -87,7 +87,7 @@ def get_raw_text(text):
     soup = BeautifulSoup(text,'html.parser')
     for script in soup(['script','style','template','TemplateString','ProcessingInstruction','Declaration','Doctype']):
         script.extract()
-    return (soup.get_text(strip=True).replace(u'\xa0', u' ').encode('ascii','ignore')[0:1000])
+    return (soup.get_text(strip=True).replace(u'\xa0', u' ').encode('ascii','ignore'))
 
 #async get html from url 
 async def get_html(session, url):
@@ -98,12 +98,15 @@ async def get_html(session, url):
                 return await response.text(), url
     #if timeout, return "TimeoutError" and url as tuple 
     except asyncio.exceptions.TimeoutError:
-        return "TimeoutError", url
+        return "Error: Timeout", url
     #if invalid url, return "InvalidURL" and url as tuple 
     except aiohttp.client_exceptions.InvalidURL:
-        return "InvaidURL", url 
+        return "Error: InvaidURL", url 
+    #if server disconnected, return "ServerDisconnected" and url as tuple
     except aiohttp.client_exceptions.ServerDisconnectedError:
-        return 'ServerDisconnected', url 
+        return 'Error: ServerDisconnected', url 
+    except UnicodeDecodeError:
+        return 'Error: UnicodeDecodeError', url
     
 #define tasks for the urls 
 async def get_all(session, urls):
@@ -165,8 +168,10 @@ def main():
 
     #inserting url info
     for text,url in cleaned_text_url:
-        tables = config.tables
-        query = 'INSERT INTO ' +tables[engine]+'(url,search_id,raw_text) values(%s,%s,%s)'
+        #restricting size of text for database constraint
+        if len(text) > 60000:
+            text = text[:60000]
+        query = 'INSERT INTO ' + config.tables[engine]+'(url,search_id,raw_text) values(%s,%s,%s)'
         cursor.execute(query, (url,last_search_id,text))
         
     #commit data to database 
